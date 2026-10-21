@@ -1,0 +1,52 @@
+
+name: Test and Build Docker Image
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  test-and-build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Check Python syntax
+        run: python -m py_compile main.py
+
+      - name: Check out the code
+        uses: actions/checkout@v5
+
+      - name: Build Docker image
+        run: docker build -t qr-code-generator .
+
+      - name: Run QR Code Generator
+        run: docker run --name qr-test qr-code-generator --url https://www.njit.edu
+
+      - name: Copy QR code from container
+        run: |
+          mkdir -p qr_output
+          docker cp qr-test:/app/qr_codes/. qr_output/
+
+      - name: Check QR code was generated
+        run: test -n "$(find qr_output -name '*.png' -type f -print -quit)"
+
+      - name: Remove test container
+        if: always()
+        run: docker rm -f qr-test
